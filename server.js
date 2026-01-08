@@ -1,111 +1,120 @@
 import express from "express";
 import fetch from "node-fetch";
-import * as cheerio from "cheerio";
-import path from "path";
-import { fileURLToPath } from "url";
+import cheerio from "cheerio";
+import cors from "cors";
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
 app.use(express.json());
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Frontend
+/**
+ * TEST ROUTE
+ */
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.send("Copart profit calculator API is running ✅");
 });
 
+/**
+ * ANALYZE ROUTE
+ */
 app.post("/analyze", async (req, res) => {
   try {
-    const { copartUrl } = req.body;
+    const { copartUrl, vin } = req.body;
 
-    // --- COPART.DE FETCH ---
-    const copartRes = await fetch(copartUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
-    });
+    if (!vin || vin.length < 11) {
+      return res.status(400).json({
+        error: "VIN je obvezen in mora biti veljaven"
+      });
+    }
 
-    const html = await copartRes.text();
-    const $ = cheerio.load(html);
+    /* ---------------- VIN CHECK (NHTSA) ---------------- */
+    const vinRes = await fetch(
+      `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`
+    );
+    const vinJson = await vinRes.json();
 
-    // Poskusi pobrat osnovne podatke
-    const title = $("title").text();
+    const get = (name) =>
+      vinJson.Results.find(r => r.Variable === name)?.Value || null;
 
-    let year = title.match(/\b(19|20)\d{2}\b/)?.[0] || null;
-    let makeModel = title.replace(year, "").replace("Copart", "").trim();
+    const vehicle = {
+      vin,
+      year: get("Model Year"),
+      make: get("Make"),
+      model: get("Model"),
+      engine: get("Engine Model"),
+      body: get("Body Class"),
+      fuel: get("Fuel Type - Primary")
+    };
 
-    // Estimated Retail Value (če obstaja)
-    let ervText = $("span:contains('Estimated Retail Value')")
-      .next()
-      .text()
-      .replace(/\D/g, "");
-
-    const estimatedRetailValue = ervText ? parseInt(ervText) : null;
-
-    // Trenutna bid cena (če obstaja)
-    let bidText = $("span:contains('Current Bid')")
-      .next()
-      .text()
-      .replace(/\D/g, "");
-
-    const currentBid = bidText ? parseInt(bidText) : 0;
-
-    // --- AVTO.NET ---
-    const searchUrl = `https://www.avto.net/Ads/results.asp?znamka=&model=&letnikOd=${year}&letnikDo=${year}`;
-    const avtoRes = await fetch(searchUrl);
-    const avtoHtml = await avtoRes.text();
-    const $$ = cheerio.load(avtoHtml);
-
+    /* ---------------- AVTO.NET ---------------- */
     let prices = [];
-    $$(".ResultsAdPrice").each((i, el) => {
-      const p = parseInt($$(el).text().replace(/\D/g, ""));
-      if (p) prices.push(p);
-    });
+    if (vehicle.make && vehicle.model && vehicle.year) {
+      const avtoUrl = `https://www.avto.net/Ads/results.asp?znamka=${vehicle.make}&model=${vehicle.model}&letnikOd=${vehicle.year}&letnikDo=${vehicle.year}`;
+      const avtoRes = await fetch(avtoUrl);
+      const html = await avtoRes.text();
+      const $ = cheerio.load(html);
 
-    const avgSI =
+      $(".ResultsAdPrice").each((i, el) => {
+        const price = parseInt($(el).text().replace(/\D/g, ""));
+        if (price) prices.push(price);
+      });
+    }
+
+    const avgPrice =
       prices.length > 0
-        ? Math.round(prices.reduce((a, b) => a + b) / prices.length)
+        ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
         : null;
 
-    // --- STROŠKI ---
+    /* ---------------- STROŠKI ---------------- */
+    const bid = 4000; // lahko kasneje naredimo slider
     const transport = 1200;
     const homologacija = 450;
     const registracija = 300;
-    const ddv = currentBid * 0.22;
     const repair = 2500;
+    const ddv = bid * 0.22;
 
     const totalCosts =
-      currentBid + transport + homologacija + registracija + ddv + repair;
+      bid +
+      transport +
+      homologacija +
+      registracija +
+      repair +
+      ddv;
 
-    const profit = avgSI ? avgSI - totalCosts : null;
+    const profit = avgPrice !== null ? avgPrice - totalCosts : null;
 
+    /* ---------------- RESPONSE ---------------- */
     res.json({
-      copart: {
-        title: title,
-        year,
-        estimatedRetailValue,
-        currentBid
-      },
+      vehicle,
       slovenia: {
-        avgPrice: avgSI,
+        avgPrice,
         listings: prices.length
       },
       costs: {
+        bid,
         transport,
         homologacija,
         registracija,
-        ddv,
         repair,
+        ddv,
         totalCosts
       },
       profit
     });
+
   } catch (err) {
-    res.json({ error: err.message });
+    console.error(err);
+    res.status(500).json({
+      error: "Napaka na strežniku"
+    });
   }
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log("Server running")
-);
+/**
+ * START SERVER
+ */
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
