@@ -5,15 +5,13 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// 1️⃣ najprej inicializiraj app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 2️⃣ middleware
 app.use(cors());
 app.use(express.json());
 
-// 3️⃣ root route za index.html
+// ----- serve index.html -----
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -21,7 +19,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// 4️⃣ /analyze route (VIN + Copart)
+// ----- analyze route -----
 app.post("/analyze", async (req, res) => {
   try {
     const { copartUrl, vin } = req.body;
@@ -29,7 +27,7 @@ app.post("/analyze", async (req, res) => {
       return res.status(400).json({ error: "VIN je obvezen" });
     }
 
-    // VIN check (NHTSA)
+    // --- VIN check ---
     const vinRes = await fetch(
       `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`
     );
@@ -45,7 +43,7 @@ app.post("/analyze", async (req, res) => {
       engine: get("Engine Model"),
     };
 
-    // Avto.net povprečne cene
+    // --- Avto.net povprečne cene ---
     let prices = [];
     if (vehicle.make && vehicle.model && vehicle.year) {
       const avtoUrl = `https://www.avto.net/Ads/results.asp?znamka=${vehicle.make}&model=${vehicle.model}&letnikOd=${vehicle.year}&letnikDo=${vehicle.year}`;
@@ -63,8 +61,8 @@ app.post("/analyze", async (req, res) => {
         ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
         : null;
 
-    // Stroški
-    const bid = 4000;
+    // --- Stroški ---
+    const bid = 4000; // lahko slider kasneje
     const transport = 1200;
     const homologacija = 450;
     const registracija = 300;
@@ -85,5 +83,5 @@ app.post("/analyze", async (req, res) => {
   }
 });
 
-// 5️⃣ start server
+// ----- start server -----
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
