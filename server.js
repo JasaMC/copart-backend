@@ -1,3 +1,12 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
 import express from "express";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
@@ -118,4 +127,5 @@ app.post("/analyze", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
