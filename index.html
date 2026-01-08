@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <title>Copart kalkulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<h2>Copart kalkulator profita</h2>
+
+<input id="link" style="width:100%" placeholder="Prilepi Copart link sem">
+
+<br><br>
+
+<button onclick="analyze()">IZRAČUNAJ</button>
+
+<pre id="result"></pre>
+
+<script>
+async function analyze() {
+    document.getElementById("result").textContent = "Delam...";
+
+    const res = await fetch("/analyze", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            copartUrl: document.getElementById("link").value
+        })
+    });
+
+    const data = await res.json();
+    document.getElementById("result").textContent =
+        JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
