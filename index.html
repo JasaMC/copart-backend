@@ -2,17 +2,23 @@
 <html lang="sl">
 <head>
 <meta charset="UTF-8">
-<title>Copart kalkulator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copart Profit Kalkulator</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 30px auto; padding: 0 15px; background: #f7f7f7; }
+  h2 { text-align: center; color: #333; }
+  input { width: 100%; padding: 10px; margin: 10px 0; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; }
+  button { padding: 12px 20px; background: #007bff; color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+  button:hover { background: #0056b3; }
+  pre { background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; margin-top: 20px; }
+</style>
 </head>
 <body>
 
-<h2>Copart DE kalkulator</h2>
+<h2>Copart DE Profit Kalkulator</h2>
 
-<input id="link" style="width:100%" placeholder="Prilepi Copart.de link">
-<br><br>
-<input id="vin" style="width:100%" placeholder="VIN (obvezno)">
-<br><br>
+<input id="link" placeholder="Prilepi Copart.de link" />
+<input id="vin" placeholder="VIN (obvezno)" />
 <button onclick="analyze()">IZRAČUNAJ</button>
 
 <pre id="result"></pre>
@@ -20,21 +26,24 @@
 <script>
 async function analyze() {
   document.getElementById("result").textContent = "Delam...";
+  const link = document.getElementById("link").value;
+  const vin = document.getElementById("vin").value;
 
-  const res = await fetch("/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      copartUrl: document.getElementById("link").value,
-      vin: document.getElementById("vin").value
-    })
-  });
+  try {
+    const res = await fetch("/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ copartUrl: link, vin })
+    });
 
-  const data = await res.json();
-  document.getElementById("result").textContent =
-    JSON.stringify(data, null, 2);
+    const data = await res.json();
+    document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    document.getElementById("result").textContent = "Napaka: " + err.message;
+  }
 }
 </script>
 
 </body>
 </html>
+
